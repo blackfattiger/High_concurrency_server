@@ -12,8 +12,19 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <pthread.h>
+#include <ctype.h> 
 
-int initListenFd(unsigned short port){
+//封装数据，用于给子线程回调函数传参
+struct FdInfo
+{
+    int fd;
+    int epfd;
+    pthread_t tid;
+};
+
+int initListenFd(unsigned short port)
+{
     //1.创建监听的fd
     int lfd =  socket(AF_INET, SOCK_STREAM, 0);
     if (lfd == -1)
@@ -79,31 +90,37 @@ int epollRun(int lfd){
         int num = epoll_wait(epfd, evs, size, -1);
         for (int i = 0; i < num; ++i)
         {
+            struct FdInfo* info = (struct FdInfo*)malloc(sizeof(struct FdInfo));
             int fd = evs[i].data.fd;
+            info->epfd = epfd;
+            info->fd = fd;
             if (fd == lfd)
             {
                 //建立新连接 accept
-                acceptClient(epfd, lfd);
+                // acceptClient(epfd, lfd); //使用多线程，将该处调用的函数放在线程的回调函数即可
+                pthread_create(&info->tid, NULL, acceptClient, info);
             }else
             {       
                 //主要是接收对端的数据
-                recvHttpRequest(fd, epfd);
-            }
-            
-        }
-        
-    }
-    
+                // recvHttpRequest(fd, epfd);
+                pthread_create(&info->tid, NULL, recvHttpRequest, info);
+            }           
+        }        
+    }   
 
     return 0;
 }
 
-int acceptClient(int epfd, int lfd){
+// int acceptClient(int epfd, int lfd)
+void* acceptClient(void* arg){
+    //需要将arg类型强转回原类型
+    struct FdInfo* info = (struct FdInfo*)arg;
     //1.建立连接
-    int cfd = accept(lfd, NULL, NULL);
+    // int cfd = accept(lfd, NULL, NULL);
+    int cfd = accept(info->fd, NULL, NULL);
     if(cfd == -1){
         perror("accept");
-        return -1;
+        return NULL;
     }
     //2.设置非阻塞
     int flag = fcntl(cfd, F_GETFL);
@@ -113,22 +130,27 @@ int acceptClient(int epfd, int lfd){
     struct epoll_event ev;
     ev.data.fd = cfd;
     ev.events = EPOLLIN | EPOLLET; //边沿非阻塞工作模式
-    int ret = epoll_ctl(epfd, EPOLL_CTL_ADD, cfd,&ev);
+    // int ret = epoll_ctl(epfd, EPOLL_CTL_ADD, cfd,&ev);
+    int ret = epoll_ctl(info->epfd, EPOLL_CTL_ADD, cfd,&ev);
     if (ret == -1)
     {
         perror("epoll_ctl");
-        retrun -1;
+        retrun NULL;
     }
-
-    return 0;
+    //此处结构体中存储的lfd和epfd不需要关闭
+    printf("acceptClient threadId: %d\n", info->tid);
+    free(info); //free指定的参数 info 和 arg 都是一样的，因为他们指向的内存相同
+    return NULL;
 }
 
-int recvHttpRequest(int cfd, int epfd){
+// int recvHttpRequest(int cfd, int epfd)
+void* recvHttpRequest(void* arg){
+    struct FdInfo* info = (struct FdInfo*)arg;
     //printf("开始接收数据了...");
     int len = 0, totle = 0;
     char tem[1024] = {0};
     char buf[4096] = {0};
-    while((len = recv(cfd, tem, sizeof tem, 0)) > 0){
+    while((len = recv(info->fd, tem, sizeof tem, 0)) > 0){
         if (totle + len < sizeof buf)
         {       
             memcpy(buf + totle, tem, len);
@@ -143,20 +165,25 @@ int recvHttpRequest(int cfd, int epfd){
         char* pt = strstr(buf, "\r\n");
         int reqLen = pt - buf;
         buf[reqLen] = "\0"; //人为将数据截断在\0处
-        parseRequestLine(buf, cfd);
+        // parseRequestLine(buf, cfd);
+        parseRequestLine(buf, info->fd);
     }
     else if(len == 0)
     {
         //客户端已经断开了连接
-        epoll_ctl(epfd, EPOLL_CTL_DEL, cfd, NULL);
-        close(cfd);
+        // epoll_ctl(epfd, EPOLL_CTL_DEL, cfd, NULL);
+        epoll_ctl(info->epfd, EPOLL_CTL_DEL, info->fd, NULL);
+        //由于此处通信完毕，所以此处结构体中通信的文件描述符fd需要关闭，epfd不需要关闭
+        close(info->fd);
     }
     else
     {
         perror("recv");
     }
-    
-    return 0; 
+    //打印查看是否是不同线程在进行处理
+    printf("recvMsg threadId: %d\n", info->tid);
+    free(info);
+    return NULL; 
 }
 
 
@@ -170,6 +197,7 @@ int parseRequestLine(const char* line, int cfd){
     {
         return -1;
     }
+    decodeMsg(path, path);//解码
     //处理客户端请求的静态资源(目录或文件)
     char * file = NULL;
     if(strcmp(path, "/") == 0){
@@ -275,8 +303,11 @@ int sendFile(const char * fileName, int cfd){
     lseek(fd, 0, SEEK_SET); //将指针重新指向头部
     while(offset < size)
     {
-        //一次调用，可能数据发送不完全，需要多次发送，所以需要使用循环，
-        int ret = sendfile(cfd, fd, &offset, size); //零拷贝函数，效率很高 
+        //一次调用，可能数据发送不完全，需要多次发送，所以需要使用循环
+        //如果在程序中ret值出现了-1，是因为用于通信的文件描述符cfd被设置为了非阻塞
+        //第三个参数传入的是地址，所以可以修改，是一个传入传出参数
+        //第四个参数是发送的文件大小，所以需要动态调整
+        int ret = sendfile(cfd, fd, &offset, size-offset); //零拷贝函数，效率很高 
         printf("ret value: %d\n", ret);
         if(ret == -1)
         {
@@ -342,4 +373,45 @@ const char* getFileType(const char* name)
         return "application/x-ns-proxy-autoconfig";
 
     return "text/plain; charset=utf-8";
+}
+
+// 将字符转换为整形数
+int hexToDec(char c)
+{
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    if (c >= 'a' && c <= 'f')
+        return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F')
+        return c - 'A' + 10;
+
+    return 0;
+}
+
+// 解码
+// to 存储解码之后的数据, 传出参数, from被解码的数据, 传入参数
+void decodeMsg(char* to, char* from)
+{
+    for (; *from != '\0'; ++to, ++from)
+    {
+        // isxdigit -> 判断字符是不是16进制格式, 取值在 0-f
+        // Linux%E5%86%85%E6%A0%B8.jpg
+        if (from[0] == '%' && isxdigit(from[1]) && isxdigit(from[2]))
+        {
+            // 将16进制的数 -> 十进制 将这个数值赋值给了字符 int -> char
+            // B2 == 178
+            // 将3个字符, 变成了一个字符, 这个字符就是原始数据
+            *to = hexToDec(from[1]) * 16 + hexToDec(from[2]);
+
+            // 跳过 from[1] 和 from[2] 因此在当前循环中已经处理过了
+            from += 2;
+        }
+        else
+        {
+            // 字符拷贝, 赋值
+            *to = *from;
+        }
+
+    }
+    *to = '\0';
 }
