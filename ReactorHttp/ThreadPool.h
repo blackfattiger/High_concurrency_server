@@ -10,7 +10,7 @@ struct ThreadPool
     struct EventLoop* mainLoop;
     bool isStart;
     int threadNum;
-    struct WokerThread* wokerThreads;
+    struct WorkerThread* workerThreads;
     int index;
 };
 

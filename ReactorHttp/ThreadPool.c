@@ -9,7 +9,7 @@ struct ThreadPool* threadPoolInit(struct EventLoop* mainLoop, int count)
     pool->mainLoop = mainLoop;
     pool->index = 0;
     pool->threadNum = count;
-    pool->wokerThreads = (struct WorkerThread*)malloc(sizeof(struct WorkerThread) * count);
+    pool->workerThreads = (struct WorkerThread*)malloc(sizeof(struct WorkerThread) * count);
     return pool;
 }
 
@@ -26,8 +26,8 @@ void threadPoolRun(struct ThreadPool* pool)
     {
         for (int i = 0; i < pool->threadNum; ++i)
         {
-            workerThreadInit(&pool->wokerThreads[i], i);
-            wokerThreadRun(&pool->wokerThreads[i]);
+            workerThreadInit(&pool->workerThreads[i], i);
+            wokerThreadRun(&pool->workerThreads[i]);
         }
     }
 }
@@ -42,7 +42,7 @@ struct EventLoop* takeWorkerEventLoop(struct ThreadPool* pool)
     struct EventLoop* evLoop = pool->mainLoop;
     if(pool->threadNum > 0)
     {
-        evLoop = pool->wokerThreads[pool->index].evLoop;
+        evLoop = pool->workerThreads[pool->index].evLoop;
         pool->index = ++pool->index % pool->threadNum;
     }
     return evLoop;
