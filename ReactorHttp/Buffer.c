@@ -134,3 +134,30 @@ int bufferSocketRead(struct Buffer* buffer, int fd)
     return result;
 }
 
+char* bufferFindCRLF(struct Buffer* buffer)
+{
+    // strstr --> 大字符串中匹配子字符串（遇到\0结束）char *strstr(const char *haystack, const char *needle);
+    // memmem --> 大数据块中匹配子数据块（需要指定数据块的大小）
+    // void *memmem(const void *haystack, size_t haystacklen,
+    //      const void* needle, size_t needlelen);
+    char* ptr = memmem(buffer->data + buffer->readPos, bufferReadableSize(buffer), "\r\n", 2); //要指向没有读的数据位置
+
+    return ptr;
+}
+
+
+int bufferSendData(struct Buffer* buffer, int socket)
+{
+    // 判断有无数据:此处未读的数据就是待发送的数据
+    int readable = bufferReadableSize(buffer);
+    if(readable > 0) // >0严谨一些，因为readable可能有为-1的情况
+    {
+        int count = send(socket, buffer->data + buffer->readPos, readable, 0);
+        if(count)
+        {
+            buffer->readPos += count;
+            usleep(1); // 主要是为了让接收端休息一下
+        }
+    }
+    return 0;
+}

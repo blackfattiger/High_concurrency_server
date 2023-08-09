@@ -79,7 +79,7 @@ void tcpServerRun(struct TcpServer* server)
     //添加检测的任务
     //初始化一个channel实例
     struct Channel* channel =  channelInit(server->listener->lfd, 
-                            ReadEvent, acceptConnection, NULL, NULL);
+                            ReadEvent, acceptConnection, NULL, NULL, server);
     eventLoopAddTask(server->mainLoop, channel, ADD);
     //启动反应堆模型
     eventLoopRun(server->mainLoop);

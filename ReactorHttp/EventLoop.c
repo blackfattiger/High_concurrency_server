@@ -51,7 +51,7 @@ struct EventLoop* eventLoopInitEx(const char* threadName)
     }
     //指定规则：evLoop->socketPair[0]发送数据， evLoop->socketPair[1]接收数据
     struct Channel* channel = channelInit(evLoop->socketPair[1], ReadEvent, 
-        readLocalMessage, NULL, evLoop);
+        readLocalMessage, NULL, NULL, evLoop);
     // channel添加到任务队列
     eventLoopAddTask(evLoop, channel, ADD);
     /*光添加到任务队列还不行，还需要遍历任务队列，从任务队列中取出每一个节点，

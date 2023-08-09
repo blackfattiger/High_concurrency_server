@@ -18,7 +18,7 @@ struct ChannelElement
     struct ChannelElement* next;
 };
 
-
+struct Dispatcher; // 先对Dispatcher进行声明，防止未定义的引用
 struct EventLoop
 {
     bool isQuit;

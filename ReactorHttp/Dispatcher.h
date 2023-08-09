@@ -2,6 +2,7 @@
 #include "Channel.h"
 #include "EventLoop.h"
 
+struct EventLoop; // 先声明
 struct Dispatcher
 {
     //init -- 初始化epoll,poll或者select 需要的数据块
