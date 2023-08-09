@@ -3,5 +3,6 @@ Three types of High concurrency server: 1.SimpleHttp; 2.ReactorHttp; 3.Reactorht
 ## 1.SimpleHttp
   epoll + multi threaded server
 ## 2.ReactorHttp
- 
+  epoll/poll/select + reactor + threadedPool server
 ## 3.ReactorHttp-Cpp
+  reconfiguration of ReactorHttp
