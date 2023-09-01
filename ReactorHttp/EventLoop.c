@@ -37,7 +37,7 @@ struct EventLoop* eventLoopInitEx(const char* threadName)
     evLoop->threadID = pthread_self();
     pthread_mutex_init(&evLoop->mutex, NULL);
     strcpy(evLoop->threadName, threadName == NULL ? "MainThread" : threadName);
-    evLoop->dispatcher = &EpollDispatcher;
+    evLoop->dispatcher = &EpollDispatcher; // 这里可以随意选择epoll、poll、select
     evLoop->dispatcherData = evLoop->dispatcher->init();
     //链表
     evLoop->head = evLoop->tail = NULL;

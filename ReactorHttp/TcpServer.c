@@ -74,6 +74,7 @@ int acceptConnection(void* arg)
 
 void tcpServerRun(struct TcpServer* server)
 {
+    Debug("服务器程序已经启动了...");
     //启动线程池
     threadPoolRun(server->threadPool);
     //添加检测的任务
@@ -83,5 +84,4 @@ void tcpServerRun(struct TcpServer* server)
     eventLoopAddTask(server->mainLoop, channel, ADD);
     //启动反应堆模型
     eventLoopRun(server->mainLoop);
-
 }

@@ -152,7 +152,8 @@ int bufferSendData(struct Buffer* buffer, int socket)
     int readable = bufferReadableSize(buffer);
     if(readable > 0) // >0严谨一些，因为readable可能有为-1的情况
     {
-        int count = send(socket, buffer->data + buffer->readPos, readable, 0);
+        // send函数第四个参数指定非零值，防止broken pipe 的情况
+        int count = send(socket, buffer->data + buffer->readPos, readable, MSG_NOSIGNAL);
         if(count)
         {
             buffer->readPos += count;

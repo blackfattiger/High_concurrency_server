@@ -10,6 +10,7 @@ int processRead(void* arg)
     struct TcpConnection* conn = (struct TcpConnection*)arg;
     //接收数据
     int count = bufferSocketRead(conn->readBuf, conn->channel->fd);
+    Debug("接收到的http请求数据:%s", conn->readBuf->data + conn->readBuf->readPos);
     if(count > 0)
     {
         //接收到了http请求， 解析http请求
@@ -47,6 +48,7 @@ int processRead(void* arg)
 
 int processWrite(void* arg)
 {
+    Debug("开始发送数据了(基于写事件发送)....");
     struct TcpConnection* conn = (struct TcpConnection*)arg;
     // 发送数据
     int count = bufferSendData(conn->writeBuf, conn->channel->fd);
@@ -75,6 +77,8 @@ struct TcpConnection* tcpConnectionInit(int fd, struct EventLoop* evLoop)
     sprintf(conn->name, "Connection-%d", fd);
     conn->channel = channelInit(fd, ReadEvent, processRead, processWrite, tcpConnectionDestroy, conn);
     eventLoopAddTask(evLoop, conn->channel, ADD);
+    Debug("和客户端建立连接, threadName:%s, threadID:%s, connName:%s",
+        evLoop->threadName, evLoop->threadID, conn->name);
 
     return conn;
 }
@@ -95,6 +99,6 @@ int tcpConnectionDestroy(void* arg)
             free(conn);
         }
     }
-
+    Debug("连接断开, 释放资源, gameover, connName: %s", conn->name);
     return 0;
 }
