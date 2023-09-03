@@ -1,20 +1,30 @@
 #pragma once
 #include "Channel.h"
 #include "EventLoop.h"
+#include <string>
+using namespace std;
 
 struct EventLoop; // 先声明
-struct Dispatcher
+class Dispatcher
 {
-    //init -- 初始化epoll,poll或者select 需要的数据块
-    void* (*init)(); 
+public:
+    Dispatcher(EventLoop* evLoop);
+    virtual ~Dispatcher();
     //添加,将文件描述符添加到对应的dispatcher文件描述符检测集合中
-    int (*add)(struct Channel* channel, struct EventLoop* evLoop);//EventLoop包含了Dispatcher和DispatcherData
+    virtual int add();//EventLoop包含了Dispatcher和DispatcherData
     //删除
-    int (*remove)(struct Channel* channel, struct EventLoop* evLoop);
+    virtual int remove();
     //修改
-    int (*modify)(struct Channel* channel, struct EventLoop* evLoop);
+    virtual int modify();
     //事件监测
-    int (*dispatch)(struct EventLoop* evLoop, int timeout); //单位：s
-    //清除数据（关闭fd或者释放内存）
-    int (*clear)(struct EventLoop* evLoop);
+    virtual int dispatch(int timeout = 2); //单位：s
+    inline void setChannel(Channel* channel){
+        m_channel = channel;
+    }
+private:
+    int epollCtl(int op);
+protected:
+    string m_name = string();
+    Channel* m_channel;
+    EventLoop* m_evLoop;
 };
